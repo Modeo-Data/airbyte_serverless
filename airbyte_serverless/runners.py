@@ -1,5 +1,5 @@
 import base64
-from google.cloud.run_v2 import Container, EnvVar, ResourceRequirements
+from google.cloud.run_v2 import Container, EnvVar, ResourceRequirements, CreateJobRequest
 import google.cloud.run_v2
 
 
@@ -30,8 +30,20 @@ class CloudRunJobRunner(BaseRunner):
     ])
 
     @staticmethod
-    def get_container(docker_image, fixed_env_var, external_env_vars):
-        container = Container(image=docker_image)
+    def get_container(docker_image: str, fixed_env_var: EnvVar, external_env_vars: list) -> Container:
+        """
+        Get the Container object for the Cloud Run job.
+
+        Args:
+            docker_image: The Docker image for the container.
+            fixed_env_var: Fixed environment variable for the container.
+            external_env_vars: List of external environment variables.
+
+        Returns:
+            Container: The Container object.
+        """
+        container = Container()
+        container.image = docker_image
         container.name = "gsheet-container"
         container.command = ["/bin/sh"]
         container.args = ['-c', 'pip install airbyte-serverless && abs run-env-vars']
@@ -45,7 +57,17 @@ class CloudRunJobRunner(BaseRunner):
         return container
 
     @staticmethod
-    def get_env_vars(config_env_vars, yaml_config):
+    def get_env_vars(config_env_vars: dict, yaml_config: str) -> tuple[EnvVar, list]:
+        """
+        Get environment variables for the Cloud Run job.
+
+        Args:
+            config_env_vars: Configuration environment variables.
+            yaml_config: YAML configuration.
+
+        Returns:
+            tuple: Tuple containing fixed and external environment variables.
+        """
         env = []
         if config_env_vars:
             assert isinstance(config_env_vars, dict), "Given env_vars argument should be a dict"
@@ -65,7 +87,28 @@ class CloudRunJobRunner(BaseRunner):
         return fixed_env_vars, ext_env_vars
 
     @staticmethod
-    def get_job_request(container, service_account, timeout, max_retries, request_parent, request_job_id):
+    def get_job_request(
+            container: Container,
+            service_account: str,
+            timeout: str,
+            max_retries: int,
+            request_parent: str,
+            request_job_id: str
+    ) -> CreateJobRequest:
+        """
+         Get the Job request for the Cloud Run job.
+
+         Args:
+             container: The Container object.
+             service_account: Service account for the job.
+             timeout: Timeout for the job.
+             max_retries: Maximum retries for the job.
+             request_parent: Parent for the job request.
+             request_job_id: Job ID for the request.
+
+         Returns:
+             The CreateJobRequest object.
+         """
         job = google.cloud.run_v2.Job()
         job.template.template.containers = [container]
         job.template.template.timeout = timeout
@@ -77,7 +120,7 @@ class CloudRunJobRunner(BaseRunner):
             "job_id": request_job_id,
             "job": job
         }
-        request = google.cloud.run_v2.CreateJobRequest(job_request)
+        request = CreateJobRequest(job_request)
 
         return request
 
